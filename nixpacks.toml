@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["deno"]
+
+[phases.build]
+cmds = ["deno cache main.ts"]
+
+[phases.start]
+cmds = ["deno run --allow-env --allow-net main.ts"]
