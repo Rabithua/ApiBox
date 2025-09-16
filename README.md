@@ -2,12 +2,22 @@
 
 一个基于 Deno 的通用 API 代理服务，支持多种第三方 API 的统一代理、缓存和管理。
 
+## 📖 文档
+
+- **[API 接口文档](./docs/API.md)** - 完整的 API 使用说明
+- **[快速参考](./docs/QUICK_REFERENCE.md)** - 常用接口和命令速查
+- **[文档目录](./docs/README.md)** - 所有文档导航
+
 ## 🏗️ 项目结构
 
 ```
 ApiBox/
 ├── main.ts                 # 主启动文件
 ├── deno.json              # Deno 配置文件
+├── docs/                  # 📖 文档目录
+│   ├── API.md            # API接口文档
+│   ├── QUICK_REFERENCE.md # 快速参考
+│   └── README.md         # 文档导航
 ├── config/
 │   └── apis.json          # API 配置文件
 ├── src/
@@ -21,8 +31,14 @@ ApiBox/
 │   │   └── engine.ts      # 代理引擎
 │   ├── routes/
 │   │   └── handler.ts     # 路由处理器
+│   ├── env/
+│   │   └── manager.ts     # 环境变量管理器
 │   └── utils/
 │       └── helpers.ts     # 工具函数
+├── tests/                 # 🧪 测试目录
+│   ├── unit/             # 单元测试
+│   ├── integration/      # 集成测试
+│   └── fixtures/         # 测试数据
 └── README.md              # 项目说明
 ```
 
@@ -134,11 +150,11 @@ curl http://localhost:8000/api
 # 外汇数据
 curl http://localhost:8000/api/forex/quote/XAU/USD
 
+# 天气数据
+curl "http://localhost:8000/api/weather/current?q=Beijing&units=metric"
+
 # HTTP 测试
 curl http://localhost:8000/api/httpbin/get
-
-# JSON 占位符数据
-curl http://localhost:8000/api/jsonplaceholder/posts/1
 
 # 健康检查
 curl http://localhost:8000/health

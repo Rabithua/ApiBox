@@ -224,7 +224,7 @@ export class RouteHandler {
         examples: [
           "/api/forex/quote/XAU/USD",
           "/api/httpbin/get",
-          "/api/jsonplaceholder/posts",
+          "/api/weather/current?q=Beijing&units=metric",
         ],
       },
       endpoints: {

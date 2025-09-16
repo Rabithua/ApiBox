@@ -59,7 +59,7 @@ async function startServer(): Promise<void> {
     );
     Logger.info(`   - http://localhost:${envConfig.PORT}/api/httpbin/get`);
     Logger.info(
-      `   - http://localhost:${envConfig.PORT}/api/jsonplaceholder/posts`
+      `   - http://localhost:${envConfig.PORT}/api/weather/current?q=Beijing&units=metric`
     );
 
     // 启动HTTP服务器

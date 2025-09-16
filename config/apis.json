@@ -105,53 +105,5 @@
         "description": "获取User-Agent信息"
       }
     }
-  },
-  "jsonplaceholder": {
-    "name": "JSON占位符API",
-    "description": "JSONPlaceholder假数据API，用于测试和原型开发",
-    "baseUrl": "https://jsonplaceholder.typicode.com",
-    "auth": {
-      "type": "none"
-    },
-    "endpoints": {
-      "posts": {
-        "path": "/posts",
-        "method": "GET",
-        "cacheDuration": 300000,
-        "description": "获取所有文章"
-      },
-      "post": {
-        "path": "/posts/{id}",
-        "method": "GET",
-        "cacheDuration": 300000,
-        "description": "根据ID获取单篇文章",
-        "parameters": {
-          "id": {
-            "type": "path",
-            "required": true,
-            "description": "文章ID"
-          }
-        }
-      },
-      "users": {
-        "path": "/users",
-        "method": "GET",
-        "cacheDuration": 300000,
-        "description": "获取所有用户"
-      },
-      "user": {
-        "path": "/users/{id}",
-        "method": "GET",
-        "cacheDuration": 300000,
-        "description": "根据ID获取单个用户",
-        "parameters": {
-          "id": {
-            "type": "path",
-            "required": true,
-            "description": "用户ID"
-          }
-        }
-      }
-    }
   }
 }
