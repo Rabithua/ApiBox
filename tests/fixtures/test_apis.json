@@ -1,0 +1,49 @@
+{
+  "test-api": {
+    "name": "测试API",
+    "description": "用于单元测试的API配置",
+    "baseUrl": "https://httpbin.org",
+    "auth": {
+      "type": "none"
+    },
+    "endpoints": {
+      "get": {
+        "path": "/get",
+        "method": "GET",
+        "cacheDuration": 5000,
+        "description": "测试GET请求",
+        "parameters": {
+          "param1": {
+            "type": "query",
+            "required": false,
+            "description": "测试查询参数"
+          }
+        }
+      },
+      "post": {
+        "path": "/post",
+        "method": "POST",
+        "cacheDuration": 0,
+        "description": "测试POST请求"
+      }
+    }
+  },
+  "auth-api": {
+    "name": "认证测试API",
+    "description": "用于测试认证的API配置",
+    "baseUrl": "https://api.example.com",
+    "auth": {
+      "type": "apikey",
+      "key": "X-API-Key",
+      "value": "ENV:TEST_API_KEY"
+    },
+    "endpoints": {
+      "secure": {
+        "path": "/secure",
+        "method": "GET",
+        "cacheDuration": 10000,
+        "description": "需要认证的端点"
+      }
+    }
+  }
+}
