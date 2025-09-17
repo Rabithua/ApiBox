@@ -14,6 +14,8 @@ import {
   getHealthStatus,
   Logger,
 } from "../utils/helpers.ts";
+import { createEmojiFaviconResponse } from "./favicon.ts";
+import { parseRequestParams } from "./params.ts";
 
 /**
  * 路由处理器类
@@ -30,26 +32,7 @@ export class RouteHandler {
   }
 
   /**
-   * 返回一个包含 emoji 的 SVG，用作 favicon
-   */
-  private handleFavicon(): Response {
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <foreignObject width="100%" height="100%">
-    <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:56px;line-height:64px;display:flex;align-items:center;justify-content:center">😈</div>
-  </foreignObject>
-</svg>`;
-
-    const headers = new Headers({
-      "Content-Type": "image/svg+xml; charset=utf-8",
-      // 缓存一小时
-      "Cache-Control": "public, max-age=3600",
-      // 防止 CORS 问题（如果在浏览器中直接请求）
-      "Access-Control-Allow-Origin": "*",
-    });
-
-    return new Response(svg, { status: 200, headers });
-  }
+  // favicon 已移至 src/routes/favicon.ts -> createEmojiFaviconResponse()
 
   /**
    * 主要请求处理器
@@ -81,7 +64,7 @@ export class RouteHandler {
 
       // favicon 路由 - 返回包含 emoji 的 SVG 以作为图标
       if (url.pathname === "/favicon.ico") {
-        return this.handleFavicon();
+        return createEmojiFaviconResponse();
       }
 
       // 缓存统计路由
@@ -146,7 +129,7 @@ export class RouteHandler {
 
     try {
       // 解析参数
-      const params = this.parseRequestParams(
+      const params = parseRequestParams(
         url,
         additionalParams,
         config,
