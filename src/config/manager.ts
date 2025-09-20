@@ -1,41 +1,38 @@
 import type { ApiConfig } from "../types/index.ts";
-import { EnvManager } from "../env/manager.ts";
-
+import { getEnvConfig } from "../env/manager.ts";
 
 /**
  * ConfigManager is a singleton class responsible for managing API configurations.
- * 
+ *
  * This class handles loading, processing, and providing access to API configurations
  * from JSON files. It supports environment variable substitution and provides
  * fallback to default configurations when the config file is not available.
- * 
+ *
  * Key features:
  * - Singleton pattern for global configuration management
  * - Environment variable processing for secure credential handling
  * - Default configuration fallback
  * - Configuration validation and error handling
  * - Dynamic configuration reloading
- * 
+ *
  * @example
  * ```typescript
  * const configManager = ConfigManager.getInstance('./config/apis.json');
  * await configManager.loadConfigs();
- * 
+ *
  * const apiConfig = configManager.getConfig('forex');
  * const hasEndpoint = configManager.hasEndpoint('forex', 'quote');
  * ```
- * 
+ *
  * @since 1.0.0
  */
 export class ConfigManager {
   private static instance: ConfigManager;
   private configs: Record<string, ApiConfig> = {};
   private configPath: string;
-  private envManager: EnvManager;
 
   private constructor(configPath = "./config/apis.json") {
     this.configPath = configPath;
-    this.envManager = EnvManager.getInstance();
   }
 
   /**
@@ -72,7 +69,7 @@ export class ConfigManager {
    * 处理环境变量
    */
   private processEnvironmentVariables(): void {
-    const envConfig = this.envManager.getConfig();
+    const envConfig = getEnvConfig();
 
     for (const config of Object.values(this.configs)) {
       if (config.auth?.value?.startsWith("ENV:")) {

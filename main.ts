@@ -6,7 +6,7 @@
 import { ConfigManager } from "./src/config/manager.ts";
 import { RouteHandler } from "./src/routes/handler.ts";
 import { Logger } from "./src/utils/helpers.ts";
-import { EnvManager } from "./src/env/manager.ts";
+import { getEnvConfig } from "./src/env/manager.ts";
 import { startHourlyCollector } from "./src/scheduler/collector.ts";
 
 /**
@@ -16,21 +16,12 @@ async function startServer(): Promise<void> {
   try {
     Logger.info("🚀 正在启动 ApiBox 通用API代理服务...");
 
-    // 初始化环境变量管理器
-    const envManager = EnvManager.getInstance();
-    const envConfig = envManager.getConfig();
-
-    // 验证环境变量
-    const validation = envManager.validate();
-    if (!validation.valid) {
-      Logger.error("❌ 环境变量验证失败:");
-      validation.errors.forEach((error) => Logger.error(`   - ${error}`));
-      Deno.exit(1);
-    }
+    // 获取环境变量配置
+    const envConfig = getEnvConfig();
 
     // 打印配置信息（在debug模式下）
     if (envConfig.LOG_LEVEL === "debug") {
-      envManager.printConfig();
+      console.log("📋 环境配置:", envConfig);
     }
 
     // 初始化配置管理器

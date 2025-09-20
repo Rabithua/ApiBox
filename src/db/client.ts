@@ -2,12 +2,15 @@
 // We dynamically import the module at runtime to avoid static type/import issues
 // during tests and to keep DB usage optional.
 
+import { getEnvConfig } from "../env/manager.ts";
+
 // client is declared at module scope and initialized in initDb()
 let client: any = null;
 
 export async function initDb(): Promise<void> {
   if (client) return;
-  const databaseUrl = Deno.env.get("DATABASE_URL");
+  const envConfig = getEnvConfig();
+  const databaseUrl = envConfig.DATABASE_URL;
   if (!databaseUrl) {
     console.warn("DATABASE_URL 未设置，跳过数据库初始化");
     return;

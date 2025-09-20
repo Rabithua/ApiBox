@@ -2,14 +2,13 @@
  * 通用工具函数
  */
 
-import { EnvManager } from "../env/manager.ts";
+import { getEnvConfig } from "../env/manager.ts";
 
 /**
  * CORS 头配置
  */
 export function getCorsHeaders(): Record<string, string> {
-  const envManager = EnvManager.getInstance();
-  const envConfig = envManager.getConfig();
+  const envConfig = getEnvConfig();
 
   return {
     "Access-Control-Allow-Origin": envConfig.CORS_ORIGIN,
@@ -57,8 +56,7 @@ export function createErrorResponse(
  */
 export class Logger {
   private static getConfig() {
-    const envManager = EnvManager.getInstance();
-    return envManager.getConfig();
+    return getEnvConfig();
   }
 
   private static colors = {

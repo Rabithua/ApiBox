@@ -1,9 +1,10 @@
 import type { CacheItem } from "../types/index.ts";
-import { EnvManager } from "../env/manager.ts";
+import { getEnvConfig } from "../env/manager.ts";
 
 // 延迟加载数据库模块的函数（仅在开启持久化时加载）
 const loadDbModule = async () => {
-  if (Deno.env.get("ENABLE_DB_PERSISTENCE") !== "true") return null;
+  const envConfig = getEnvConfig();
+  if (!envConfig.ENABLE_DB_PERSISTENCE) return null;
   try {
     return await import("../db/client.ts");
   } catch (_e) {
@@ -27,8 +28,7 @@ export class CacheManager {
     this.cache = new Map();
 
     // 从环境变量获取配置
-    const envManager = EnvManager.getInstance();
-    const envConfig = envManager.getConfig();
+    const envConfig = getEnvConfig();
     this.maxSize = envConfig.CACHE_MAX_SIZE;
     this.defaultTtl = envConfig.CACHE_DEFAULT_TTL;
   }
@@ -152,7 +152,8 @@ export class CacheManager {
     }
 
     // 如果没有开启持久化，直接返回内存历史（按时间升序并筛选）
-    if (Deno.env.get("ENABLE_DB_PERSISTENCE") !== "true") {
+    const envConfig = getEnvConfig();
+    if (!envConfig.ENABLE_DB_PERSISTENCE) {
       let history = memHistory.slice();
       if (start !== undefined)
         history = history.filter((h) => h.timestamp >= start);
