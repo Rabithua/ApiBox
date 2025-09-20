@@ -16,3 +16,23 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   errors?: ApiError[];
 }
+
+// Forex quote data structure
+export interface ForexQuote {
+  id?: number;
+  instrument: string;
+  currency: string;
+  timestamp: Date;
+  data: any; // Raw forex data from API
+  created_at?: Date;
+}
+
+// Forex history query parameters
+export interface ForexHistoryQuery {
+  instrument: string;
+  currency: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  page?: number;
+}

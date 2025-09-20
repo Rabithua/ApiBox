@@ -262,6 +262,162 @@ export async function closeDatabase(): Promise<void> {
 }
 
 /**
+ * Initialize database tables for forex data
+ */
+export async function initializeForexTables(): Promise<void> {
+  const db = getDatabase();
+
+  try {
+    // Create the main table
+    const createTableSQL = `
+      CREATE TABLE IF NOT EXISTS forex_history (
+        id SERIAL PRIMARY KEY,
+        instrument VARCHAR(10) NOT NULL,
+        currency VARCHAR(10) NOT NULL,
+        timestamp TIMESTAMPTZ NOT NULL,
+        data JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(instrument, currency, timestamp)
+      )
+    `;
+
+    await db.query(createTableSQL);
+    Logger.info("📊 Forex history table created");
+
+    // Create indexes separately
+    const indexes = [
+      `CREATE INDEX IF NOT EXISTS idx_forex_history_instrument_currency 
+       ON forex_history (instrument, currency)`,
+      `CREATE INDEX IF NOT EXISTS idx_forex_history_timestamp 
+       ON forex_history (timestamp)`,
+      `CREATE INDEX IF NOT EXISTS idx_forex_history_created_at 
+       ON forex_history (created_at)`,
+    ];
+
+    for (const indexSQL of indexes) {
+      await db.query(indexSQL);
+    }
+
+    Logger.success(
+      "✅ Forex history tables and indexes initialized successfully"
+    );
+  } catch (error) {
+    Logger.error(`❌ Failed to initialize forex tables: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Save forex quote data to database
+ */
+export async function saveForexQuote(
+  instrument: string,
+  currency: string,
+  data: any,
+  timestamp?: Date
+): Promise<void> {
+  const db = getDatabase();
+
+  const insertSQL = `
+    INSERT INTO forex_history (instrument, currency, timestamp, data)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (instrument, currency, timestamp) DO UPDATE SET
+      data = EXCLUDED.data,
+      created_at = CURRENT_TIMESTAMP
+  `;
+
+  const queryTimestamp = timestamp || new Date();
+
+  try {
+    await db.query(insertSQL, [
+      instrument.toUpperCase(),
+      currency.toUpperCase(),
+      queryTimestamp,
+      JSON.stringify(data),
+    ]);
+
+    Logger.info(
+      `📊 Forex data saved: ${instrument}/${currency} at ${queryTimestamp.toISOString()}`
+    );
+  } catch (error) {
+    Logger.error(`❌ Failed to save forex data: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Get forex history data from database
+ */
+export async function getForexHistory(
+  instrument: string,
+  currency: string,
+  startDate?: Date,
+  endDate?: Date,
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ data: any[]; total: number }> {
+  const db = getDatabase();
+
+  let whereClause = "WHERE instrument = $1 AND currency = $2";
+  const params: any[] = [instrument.toUpperCase(), currency.toUpperCase()];
+  let paramIndex = 3;
+
+  if (startDate) {
+    whereClause += ` AND timestamp >= $${paramIndex}`;
+    params.push(startDate);
+    paramIndex++;
+  }
+
+  if (endDate) {
+    whereClause += ` AND timestamp <= $${paramIndex}`;
+    params.push(endDate);
+    paramIndex++;
+  }
+
+  // Get total count
+  const countSQL = `
+    SELECT COUNT(*) as total 
+    FROM forex_history 
+    ${whereClause}
+  `;
+
+  // Get data with pagination
+  const dataSQL = `
+    SELECT id, instrument, currency, timestamp, data, created_at
+    FROM forex_history 
+    ${whereClause}
+    ORDER BY timestamp DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  params.push(limit, offset);
+
+  try {
+    const [countResult, dataResult] = await Promise.all([
+      db.query<{ total: number }>(countSQL, params.slice(0, paramIndex - 1)),
+      db.query(dataSQL, params),
+    ]);
+
+    const total = countResult.rows[0]?.total || 0;
+
+    Logger.info(
+      `📈 Retrieved ${dataResult.rows.length} forex history records for ${instrument}/${currency}`
+    );
+
+    return {
+      data: dataResult.rows.map((row) => ({
+        ...row,
+        data: typeof row.data === "string" ? JSON.parse(row.data) : row.data,
+      })),
+      total: Number(total),
+    };
+  } catch (error) {
+    Logger.error(`❌ Failed to get forex history: ${error}`);
+    throw error;
+  }
+}
+
+/**
  * Database health check for monitoring
  */
 export async function databaseHealthCheck(): Promise<{

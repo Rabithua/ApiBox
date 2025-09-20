@@ -6,7 +6,16 @@
 import { handleRequest } from "./src/routes/index.ts";
 import { Logger } from "./src/utils/helpers.ts";
 import { getEnvConfig } from "./src/utils/env.ts";
-import { initializeDatabase, closeDatabase } from "./src/utils/database.ts";
+import {
+  initializeDatabase,
+  closeDatabase,
+  initializeForexTables,
+} from "./src/utils/database.ts";
+import {
+  initializeScheduler,
+  shutdownScheduler,
+} from "./src/utils/scheduler.ts";
+import { initializeForexTasks } from "./src/routes/forex.ts";
 
 /**
  * Start server
@@ -26,6 +35,16 @@ async function startServer(): Promise<void> {
       try {
         await initializeDatabase();
         Logger.success("🗄️ Database connection established");
+
+        // Initialize forex tables
+        await initializeForexTables();
+        Logger.success("📊 Forex tables initialized");
+
+        // Initialize scheduler and forex tasks
+        const scheduler = initializeScheduler();
+        initializeForexTasks();
+        scheduler.start();
+        Logger.success("📅 Task scheduler started");
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
@@ -55,6 +74,16 @@ async function startServer(): Promise<void> {
     // Graceful shutdown handling
     const shutdown = async () => {
       Logger.info("🛑 Shutting down server...");
+
+      // Stop scheduler
+      try {
+        shutdownScheduler();
+        Logger.success("📅 Task scheduler stopped");
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        Logger.error(`❌ Error stopping scheduler: ${errorMessage}`);
+      }
 
       // Close database connections
       try {
