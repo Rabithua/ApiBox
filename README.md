@@ -140,10 +140,13 @@ export LOG_LEVEL=debug
 - `GET /health` - 健康检查
 - `GET /stats` - 缓存统计信息
 - `GET /api/{apiName}/{endpoint}/{...params}` - API 代理
+- `GET /api/forex/history/XAU` - 获取黄金（XAU）过去按小时采样的历史价格
+  - 可选查询参数: `start` (ISO 时间或毫秒时间戳), `end` (ISO 时间或毫秒时间戳)
+  - 示例: `/api/forex/history/XAU?start=2025-09-13T00:00:00Z&end=2025-09-20T00:00:00Z`
 
 ### 示例请求
 
-```bash
+````bash
 # 查看 API 文档
 curl http://localhost:8000/api
 
@@ -161,7 +164,17 @@ curl http://localhost:8000/health
 
 # 统计信息
 curl http://localhost:8000/stats
-```
+
+# 黄金历史查询示例
+```bash
+# 获取最近7天每小时价格（如果缓存存在）
+curl http://localhost:8000/api/forex/history/XAU
+
+# 获取指定时间范围
+curl "http://localhost:8000/api/forex/history/XAU?start=2025-09-13T00:00:00Z&end=2025-09-20T00:00:00Z"
+````
+
+````
 
 ## ⚙️ 配置管理
 
@@ -201,7 +214,7 @@ curl http://localhost:8000/stats
     }
   }
 }
-```
+````
 
 ### 添加新的 API
 

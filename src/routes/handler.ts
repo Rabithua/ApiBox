@@ -52,6 +52,11 @@ export class RouteHandler {
         return createJsonResponse(getHealthStatus());
       }
 
+      // 黄金历史数据接口: /api/forex/history/XAU
+      if (url.pathname.startsWith("/api/forex/history")) {
+        return this.handleForexHistory(url);
+      }
+
       // API代理路由: /api/{apiName}/{endpoint}/{...params}
       if (url.pathname.startsWith("/api/")) {
         return await this.handleApiProxy(req, url);
@@ -80,6 +85,42 @@ export class RouteHandler {
         message: error instanceof Error ? error.message : "未知错误",
       });
     }
+  }
+
+  /**
+   * 处理黄金历史数据请求
+   * 支持查询参数: start, end (ISO字符串或时间戳毫秒)
+   */
+  private handleForexHistory(url: URL): Response {
+    // path: /api/forex/history/XAU or /api/forex/history
+    const parts = url.pathname.split("/").filter(Boolean); // e.g. ["api","forex","history","XAU"]
+    const instrument = (parts[3] || "XAU").toUpperCase();
+
+    // 仅支持 XAU
+    if (instrument !== "XAU") {
+      return createErrorResponse("仅支持 XAU 黄金历史数据", 400, {
+        requested: instrument,
+      });
+    }
+
+    const startParam = url.searchParams.get("start");
+    const endParam = url.searchParams.get("end");
+
+    const parseTime = (v: string | null): number | undefined => {
+      if (!v) return undefined;
+      // 尝试解析为数字时间戳
+      if (/^\d+$/.test(v)) return Number(v);
+      const t = Date.parse(v);
+      return isNaN(t) ? undefined : t;
+    };
+
+    const start = parseTime(startParam);
+    const end = parseTime(endParam);
+
+    const histKey = `forex:history:${instrument}`;
+    const history = this.cacheManager.getHistory(histKey, start, end);
+
+    return createJsonResponse({ instrument, count: history.length, history });
   }
 
   /**

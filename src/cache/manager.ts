@@ -9,6 +9,8 @@ export class CacheManager {
   private cache: Map<string, CacheItem>;
   private maxSize: number;
   private defaultTtl: number;
+  // 历史数据最大保存条数（默认 168 小时 = 7 天）
+  private historyMaxEntries = 24 * 7;
 
   private constructor() {
     this.cache = new Map();
@@ -55,6 +57,71 @@ export class CacheManager {
         this.cache.delete(key);
       }, ttl);
     }
+  }
+
+  /**
+   * 将单个小时的快照追加到指定历史队列（按整点采样）
+   * key 例如: `forex:history:XAU`
+   * snapshot: { timestamp: number, value: any }
+   */
+  public appendHourlySnapshot(
+    key: string,
+    snapshot: { timestamp: number; value: unknown }
+  ): void {
+    // 获取已有历史
+    const existing = this.cache.get(key) as CacheItem | undefined;
+    let history: Array<{ timestamp: number; value: unknown }> = [];
+
+    if (existing && Array.isArray(existing.data)) {
+      history = existing.data as Array<{ timestamp: number; value: unknown }>;
+    }
+
+    // 如果最后一条和当前小时相同（同一整点），则覆盖最后一条
+    const last = history[history.length - 1];
+    const lastHour = last ? Math.floor(last.timestamp / 3600000) : null;
+    const curHour = Math.floor(snapshot.timestamp / 3600000);
+
+    if (last && lastHour === curHour) {
+      history[history.length - 1] = snapshot;
+    } else {
+      history.push(snapshot);
+    }
+
+    // 裁剪到最大条数
+    if (history.length > this.historyMaxEntries) {
+      history = history.slice(history.length - this.historyMaxEntries);
+    }
+
+    // 存回缓存（不使用 TTL，因为我们通过条数来控制历史长度）
+    const item: CacheItem = { data: history, timestamp: Date.now() };
+    this.cache.set(key, item);
+  }
+
+  /**
+   * 获取历史数据。返回按时间升序的数组
+   * start 和 end 是可选的 ISO 字符串或时间戳（毫秒）
+   */
+  public getHistory(
+    key: string,
+    start?: number,
+    end?: number
+  ): Array<{ timestamp: number; value: unknown }> {
+    const existing = this.cache.get(key) as CacheItem | undefined;
+    if (!existing || !Array.isArray(existing.data)) return [];
+
+    let history = existing.data as Array<{ timestamp: number; value: unknown }>;
+
+    // 过滤时间范围
+    if (start !== undefined) {
+      history = history.filter((h) => h.timestamp >= start);
+    }
+    if (end !== undefined) {
+      history = history.filter((h) => h.timestamp <= end);
+    }
+
+    // 保证按时间升序
+    history.sort((a, b) => a.timestamp - b.timestamp);
+    return history;
   }
 
   /**

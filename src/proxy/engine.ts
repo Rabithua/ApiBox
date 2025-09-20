@@ -99,6 +99,52 @@ export class ProxyEngine {
         console.log(`缓存数据: ${cacheKey}`);
       }
 
+      // 如果是 forex:quote 并且是 XAU，尝试追加每小时快照到历史中
+      try {
+        if (apiName === "forex" && endpoint === "quote") {
+          const instrument =
+            params.pathParams.instrument || params.pathParams["instrument"];
+          if (instrument && instrument.toUpperCase() === "XAU") {
+            // 尝试从响应中提取价格（支持多种结构）
+            let price: unknown = null;
+
+            // 如果返回数组，尝试取第一个对象
+            const sample = Array.isArray(data) ? data[0] : data;
+
+            if (sample) {
+              if ((sample as any).price !== undefined)
+                price = (sample as any).price;
+              else if ((sample as any).last !== undefined)
+                price = (sample as any).last;
+              else if ((sample as any).bid !== undefined)
+                price = (sample as any).bid;
+              else if ((sample as any).ask !== undefined)
+                price = (sample as any).ask;
+              else if ((sample as any).p !== undefined)
+                price = (sample as any).p;
+            }
+
+            if (price !== null && price !== undefined) {
+              const histKey = `forex:history:${instrument.toUpperCase()}`;
+              const timestamp = Date.now();
+              // 归一化为数字如果可能
+              const numeric = typeof price === "string" ? Number(price) : price;
+              this.cacheManager.appendHourlySnapshot(histKey, {
+                timestamp,
+                value: numeric,
+              });
+              console.log(
+                `追加历史快照: ${histKey} @ ${new Date(
+                  timestamp
+                ).toISOString()} = ${numeric}`
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("追加历史快照失败:", err);
+      }
+
       return data;
     } catch (error) {
       console.error(`API代理请求失败 [${apiName}:${endpoint}]:`, error);
