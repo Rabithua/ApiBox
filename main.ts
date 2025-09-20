@@ -78,7 +78,26 @@ async function startServer(): Promise<void> {
     // 优雅关闭处理
     const shutdown = () => {
       Logger.info("🛑 正在关闭服务器...");
-      server.shutdown();
+      try {
+        // 关闭 HTTP 服务器
+        server.shutdown();
+      } catch (_e) {
+        // ignore
+      }
+      // 关闭数据库连接（如果存在）
+      try {
+        // 动态导入并调用 closeDb
+        import("./src/db/client.ts")
+          .then((mod) => {
+            if (typeof mod.closeDb === "function") {
+              mod.closeDb().catch(() => {});
+            }
+          })
+          .catch(() => {});
+      } catch (_e) {
+        // ignore
+      }
+
       Logger.success("✅ 服务器已关闭");
       Deno.exit(0);
     };
