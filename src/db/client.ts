@@ -39,18 +39,21 @@ export async function closeDb(): Promise<void> {
 export async function insertSnapshot(
   instrument: string,
   timestamp: number,
-  value: number | string
+  value: unknown
 ): Promise<void> {
+  // 确保已连接（长连接模式：initDb 会建立并保持连接）
+  if (!client) await initDb();
   if (!client) return;
   try {
     // 将毫秒时间戳转换为 JS Date 以便正确插入到 TIMESTAMP WITH TIME ZONE
     const ts = new Date(timestamp);
-    // queryArray may accept SQL + params; using runtime `any` avoids TS signature issues
+    // 将 value 序列化为 JSON 并以 JSONB 类型插入
+    const json = JSON.stringify(value === undefined ? null : value);
     await client.queryArray(
-      "INSERT INTO forex_history (instrument, ts, value) VALUES ($1, $2, $3)",
+      "INSERT INTO forex_history (instrument, ts, value) VALUES ($1, $2, $3::jsonb)",
       instrument,
       ts,
-      value
+      json
     );
   } catch (err) {
     console.warn("⚠️ 插入快照到数据库失败:", err);
@@ -58,6 +61,7 @@ export async function insertSnapshot(
 }
 
 export async function ensureSchema(): Promise<void> {
+  if (!client) await initDb();
   if (!client) return;
   try {
     const create = `
@@ -65,7 +69,7 @@ export async function ensureSchema(): Promise<void> {
         id BIGSERIAL PRIMARY KEY,
         instrument VARCHAR(16) NOT NULL,
         ts TIMESTAMP WITH TIME ZONE NOT NULL,
-        value NUMERIC NOT NULL
+        value JSONB NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_forex_history_instrument_ts ON forex_history (instrument, ts);
     `;
@@ -87,6 +91,7 @@ export async function queryHistory(
   start?: number,
   end?: number
 ): Promise<Array<{ timestamp: number; value: number }>> {
+  if (!client) await initDb();
   if (!client) return [];
   try {
     const params: any[] = [instrument];
@@ -108,10 +113,17 @@ export async function queryHistory(
 
     // res.rows may be an array of arrays [ts, value]
     const rows = res.rows || [];
-    return rows.map((r: any) => ({
-      timestamp: new Date(r[0]).getTime(),
-      value: Number(r[1]),
-    }));
+    return rows.map((r: any) => {
+      let val: any = r[1];
+      if (typeof val === "string") {
+        try {
+          val = JSON.parse(val);
+        } catch (_e) {
+          // keep as string
+        }
+      }
+      return { timestamp: new Date(r[0]).getTime(), value: val };
+    });
   } catch (err) {
     console.warn("⚠️ 查询历史失败:", err);
     return [];

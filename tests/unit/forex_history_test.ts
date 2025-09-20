@@ -1,6 +1,13 @@
 import { CacheManager } from "../../src/cache/manager.ts";
 
 Deno.test("Forex history - append and retrieve hourly snapshots", async () => {
+  // 在测试中禁用持久化以避免建立真实的数据库连接
+  try {
+    Deno.env.set("ENABLE_DB_PERSISTENCE", "false");
+  } catch (_e) {
+    // ignore if env not writable in this environment
+  }
+
   const cm = CacheManager.getInstance();
 
   // 清理之前的测试数据

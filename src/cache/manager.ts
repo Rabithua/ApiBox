@@ -115,14 +115,17 @@ export class CacheManager {
         const parts = key.split(":");
         const instrument = parts[2] || parts[1] || "XAU";
         const snapshotToWrite = history[history.length - 1];
-        const numeric =
-          typeof snapshotToWrite.value === "string"
-            ? Number(snapshotToWrite.value)
-            : (snapshotToWrite.value as number);
 
-        await db.initDb();
+        // 切换到长连接模式：初始化数据库连接（如果尚未建立），保持连接以便后续复用
+        if (typeof db.initDb === "function") {
+          await db.initDb();
+        }
         await db.ensureSchema();
-        await db.insertSnapshot(instrument, snapshotToWrite.timestamp, numeric);
+        await db.insertSnapshot(
+          instrument,
+          snapshotToWrite.timestamp,
+          snapshotToWrite.value
+        );
       } catch (err) {
         console.warn("数据库持久化失败:", err);
       }

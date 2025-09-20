@@ -127,17 +127,26 @@ export class ProxyEngine {
             if (price !== null && price !== undefined) {
               const histKey = `forex:history:${instrument.toUpperCase()}`;
               const timestamp = Date.now();
-              // 归一化为数字如果可能
-              const numeric = typeof price === "string" ? Number(price) : price;
+              // 保存完整响应对象（或数组的第一个对象）作为 value
+              const snapshotValue = sample || data;
               this.cacheManager.appendHourlySnapshot(histKey, {
                 timestamp,
-                value: numeric,
+                value: snapshotValue,
               });
-              console.log(
-                `追加历史快照: ${histKey} @ ${new Date(
-                  timestamp
-                ).toISOString()} = ${numeric}`
-              );
+              try {
+                const short = JSON.stringify(snapshotValue);
+                console.log(
+                  `追加历史快照: ${histKey} @ ${new Date(
+                    timestamp
+                  ).toISOString()} = ${short}`
+                );
+              } catch (_e) {
+                console.log(
+                  `追加历史快照: ${histKey} @ ${new Date(
+                    timestamp
+                  ).toISOString()}`
+                );
+              }
             }
           }
         }

@@ -7,6 +7,7 @@ import { ConfigManager } from "./src/config/manager.ts";
 import { RouteHandler } from "./src/routes/handler.ts";
 import { Logger } from "./src/utils/helpers.ts";
 import { EnvManager } from "./src/env/manager.ts";
+import { startHourlyCollector } from "./src/scheduler/collector.ts";
 
 /**
  * 启动服务器
@@ -88,6 +89,13 @@ async function startServer(): Promise<void> {
 
     // 等待服务器完成
     await server.finished;
+    // 启动每小时采集（在服务器启动后）
+    try {
+      startHourlyCollector();
+      Logger.info("定时采集已启动（按整点每小时）");
+    } catch (err) {
+      Logger.warn(`启动定时采集失败: ${err}`);
+    }
   } catch (error) {
     Logger.error(`❌ 服务器启动失败: ${error}`);
     Deno.exit(1);
