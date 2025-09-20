@@ -1,5 +1,5 @@
 /**
- * 返回一个包含 emoji 的 SVG，用作 favicon
+ * Return an SVG with an emoji as a favicon
  */
 export function createEmojiFaviconResponse(): Response {
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -11,9 +11,7 @@ export function createEmojiFaviconResponse(): Response {
 
   const headers = new Headers({
     "Content-Type": "image/svg+xml; charset=utf-8",
-    // 缓存一小时
     "Cache-Control": "public, max-age=3600",
-    // 允许跨域直接请求（通常favicon不需要，但保持安全）
     "Access-Control-Allow-Origin": "*",
   });
 

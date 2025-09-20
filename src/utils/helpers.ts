@@ -1,11 +1,11 @@
 /**
- * 通用工具函数
+ * Common utility functions
  */
 
-import { getEnvConfig } from "../env/manager.ts";
+import { getEnvConfig } from "./env.ts";
 
 /**
- * CORS 头配置
+ * CORS headers configuration
  */
 export function getCorsHeaders(): Record<string, string> {
   const envConfig = getEnvConfig();
@@ -18,14 +18,21 @@ export function getCorsHeaders(): Record<string, string> {
 }
 
 /**
- * 创建JSON响应
+ * Create JSON response with GitHub-style format
  */
-export function createJsonResponse(
-  data: unknown,
+export function createJsonResponse<T = unknown>(
+  data: T,
   status = 200,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  message?: string
 ): Response {
-  return new Response(JSON.stringify(data, null, 2), {
+  const responseBody = {
+    status: "success" as const,
+    data,
+    ...(message && { message }),
+  };
+
+  return new Response(JSON.stringify(responseBody, null, 2), {
     status,
     headers: {
       ...getCorsHeaders(),
@@ -36,123 +43,92 @@ export function createJsonResponse(
 }
 
 /**
- * 创建错误响应
+ * Create error response with GitHub-style format
  */
 export function createErrorResponse(
-  error: string,
+  message: string,
   status = 500,
+  errors?: Array<{ field?: string; code: string; message: string }>,
   details?: Record<string, unknown>
 ): Response {
-  const errorData: Record<string, unknown> = { error };
-  if (details) {
-    errorData.details = details;
-  }
+  const responseBody = {
+    status: "error" as const,
+    message,
+    ...(errors && { errors }),
+    ...(details && { details }),
+  };
 
-  return createJsonResponse(errorData, status);
+  return new Response(JSON.stringify(responseBody, null, 2), {
+    status,
+    headers: {
+      ...getCorsHeaders(),
+      "Content-Type": "application/json",
+    },
+  });
 }
 
 /**
- * 日志格式化器
+ * Logging utility functions
  */
-export class Logger {
-  private static getConfig() {
-    return getEnvConfig();
-  }
 
-  private static colors = {
-    reset: "\x1b[0m",
-    red: "\x1b[31m",
-    green: "\x1b[32m",
-    yellow: "\x1b[33m",
-    blue: "\x1b[34m",
-    magenta: "\x1b[35m",
-    cyan: "\x1b[36m",
-    gray: "\x1b[90m",
-  };
+// Log color configuration
+const colors = {
+  reset: "\x1b[0m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
+  gray: "\x1b[90m",
+};
 
-  private static timestamp(): string {
-    return new Date().toISOString();
-  }
-
-  private static formatMessage(
-    level: string,
-    message: string,
-    color: string
-  ): string {
-    const config = this.getConfig();
-    const ts = this.timestamp();
-    if (config.LOG_COLORIZE) {
-      return `${this.colors.gray}[${ts}]${this.colors.reset} ${color}${level}${this.colors.reset} ${message}`;
-    }
-    return `[${ts}] ${level} ${message}`;
-  }
-
-  private static shouldLog(level: string): boolean {
-    const config = this.getConfig();
-    const levels = ["debug", "info", "warn", "error"];
-    const currentLevelIndex = levels.indexOf(config.LOG_LEVEL);
-    const messageLevelIndex = levels.indexOf(level.toLowerCase());
-    return messageLevelIndex >= currentLevelIndex;
-  }
-
-  public static info(message: string): void {
-    if (this.shouldLog("info")) {
-      console.log(this.formatMessage("INFO", message, this.colors.blue));
-    }
-  }
-
-  public static warn(message: string): void {
-    if (this.shouldLog("warn")) {
-      console.warn(this.formatMessage("WARN", message, this.colors.yellow));
-    }
-  }
-
-  public static error(message: string): void {
-    if (this.shouldLog("error")) {
-      console.error(this.formatMessage("ERROR", message, this.colors.red));
-    }
-  }
-
-  public static success(message: string): void {
-    if (this.shouldLog("info")) {
-      console.log(this.formatMessage("SUCCESS", message, this.colors.green));
-    }
-  }
-
-  public static debug(message: string): void {
-    if (this.shouldLog("debug")) {
-      console.log(this.formatMessage("DEBUG", message, this.colors.magenta));
-    }
-  }
+function getTimestamp(): string {
+  return new Date().toISOString();
 }
 
-/**
- * 解析路径参数
- */
-export function parsePathParams(
-  pathname: string,
-  basePath: string
-): { apiName?: string; endpoint?: string; additionalParams: string[] } {
-  const pathParts = pathname
-    .replace(basePath, "")
-    .split("/")
-    .filter((part) => part);
-
-  return {
-    apiName: pathParts[0],
-    endpoint: pathParts[1],
-    additionalParams: pathParts.slice(2),
-  };
+function formatMessage(level: string, message: string, color: string): string {
+  const config = getEnvConfig();
+  const ts = getTimestamp();
+  if (config.LOG_COLORIZE) {
+    return `${colors.gray}[${ts}]${colors.reset} ${color}${level}${colors.reset} ${message}`;
+  }
+  return `[${ts}] ${level} ${message}`;
 }
 
-/**
- * 健康检查
- */
-export function getHealthStatus(): unknown {
-  return {
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: performance.now(),
-    memory: Deno.memoryUsage?.() || "unknown",
-  };
+function shouldLog(level: string): boolean {
+  const config = getEnvConfig();
+  const levels = ["debug", "info", "warn", "error"];
+  const currentLevelIndex = levels.indexOf(config.LOG_LEVEL);
+  const messageLevelIndex = levels.indexOf(level.toLowerCase());
+  return messageLevelIndex >= currentLevelIndex;
 }
+
+// Logging utility object
+export const Logger = {
+  info: (message: string): void => {
+    if (shouldLog("info")) {
+      console.log(formatMessage("INFO", message, colors.blue));
+    }
+  },
+  warn: (message: string): void => {
+    if (shouldLog("warn")) {
+      console.warn(formatMessage("WARN", message, colors.yellow));
+    }
+  },
+  error: (message: string): void => {
+    if (shouldLog("error")) {
+      console.error(formatMessage("ERROR", message, colors.red));
+    }
+  },
+  success: (message: string): void => {
+    if (shouldLog("info")) {
+      console.log(formatMessage("SUCCESS", message, colors.green));
+    }
+  },
+  debug: (message: string): void => {
+    if (shouldLog("debug")) {
+      console.log(formatMessage("DEBUG", message, colors.magenta));
+    }
+  },
+};
