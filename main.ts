@@ -6,6 +6,7 @@
 import { handleRequest } from "./src/routes/index.ts";
 import { Logger } from "./src/utils/helpers.ts";
 import { getEnvConfig } from "./src/utils/env.ts";
+import { initializeDatabase, closeDatabase } from "./src/utils/database.ts";
 
 /**
  * Start server
@@ -18,6 +19,23 @@ async function startServer(): Promise<void> {
 
     if (envConfig.LOG_LEVEL === "debug") {
       console.log("📋 Environment config:", envConfig);
+    }
+
+    // Initialize database if DATABASE_URL is provided
+    if (envConfig.DATABASE_URL) {
+      try {
+        await initializeDatabase();
+        Logger.success("🗄️ Database connection established");
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        Logger.error(`❌ Database initialization failed: ${errorMessage}`);
+        Logger.warn("⚠️ Continuing without database support");
+      }
+    } else {
+      Logger.info(
+        "ℹ️ No DATABASE_URL provided, running without database support"
+      );
     }
 
     Logger.success(`🚀 ApiBox started on http://localhost:${envConfig.PORT}`);
@@ -35,13 +53,25 @@ async function startServer(): Promise<void> {
     );
 
     // Graceful shutdown handling
-    const shutdown = () => {
+    const shutdown = async () => {
       Logger.info("🛑 Shutting down server...");
+
+      // Close database connections
+      try {
+        await closeDatabase();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        Logger.error(`❌ Error closing database: ${errorMessage}`);
+      }
+
+      // Close HTTP server
       try {
         server.shutdown();
       } catch (_e) {
         // ignore
       }
+
       Logger.success("✅ Server closed");
       Deno.exit(0);
     };

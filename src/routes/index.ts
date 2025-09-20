@@ -11,6 +11,7 @@ import {
 } from "../utils/helpers.ts";
 import { createEmojiFaviconResponse } from "./favicon.ts";
 import { handleForexQuote } from "./forex.ts";
+import { databaseHealthCheck } from "../utils/database.ts";
 
 /**
  * Main request handler
@@ -35,6 +36,20 @@ export async function handleRequest(req: Request): Promise<Response> {
       return await handleForexQuote(url);
     }
 
+    // Database health check route
+    if (url.pathname === "/health/database") {
+      Logger.debug("Checking database health");
+      const healthStatus = await databaseHealthCheck();
+      const statusCode = healthStatus.status === "healthy" ? 200 : 503;
+
+      return createJsonResponse(
+        healthStatus,
+        statusCode,
+        {},
+        `Database health check ${healthStatus.status}`
+      );
+    }
+
     // Root path returns service info
     if (url.pathname === "/") {
       Logger.debug("Serving service info");
@@ -45,6 +60,7 @@ export async function handleRequest(req: Request): Promise<Response> {
           description: "Universal API proxy service",
           endpoints: {
             forex: "/api/forex/quote/{instrument}/{currency}",
+            database_health: "/health/database",
             info: "/",
             favicon: "/favicon.ico",
           },
@@ -77,6 +93,8 @@ export async function handleRequest(req: Request): Promise<Response> {
           info: "/ - Service information and available endpoints",
           forex:
             "/api/forex/quote/{instrument}/{currency} - Real-time forex quotes",
+          database_health:
+            "/health/database - Database connection health check",
           favicon: "/favicon.ico - Service favicon",
         },
         examples: {

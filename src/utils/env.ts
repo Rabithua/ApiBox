@@ -11,6 +11,7 @@ export interface EnvConfig {
   CORS_METHODS: string;
   CORS_HEADERS: string;
   HEALTH_CHECK_ENABLED: boolean;
+  DATABASE_URL?: string;
 }
 
 /**
@@ -31,5 +32,6 @@ export function getEnvConfig(): EnvConfig {
     CORS_HEADERS:
       Deno.env.get("CORS_HEADERS") || "Content-Type,Authorization,X-API-Key",
     HEALTH_CHECK_ENABLED: Deno.env.get("HEALTH_CHECK_ENABLED") !== "false",
+    DATABASE_URL: Deno.env.get("DATABASE_URL"),
   };
 }
