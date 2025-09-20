@@ -106,28 +106,13 @@ export class ProxyEngine {
             params.pathParams.instrument || params.pathParams["instrument"];
           if (instrument && instrument.toUpperCase() === "XAU") {
             // 尝试从响应中提取价格（支持多种结构）
-            let price: unknown = null;
-
             // 如果返回数组，尝试取第一个对象
             const sample = Array.isArray(data) ? data[0] : data;
 
+            // 即使没有明确的 price 字段，也保存完整响应对象（或数组的第一个对象）作为快照
             if (sample) {
-              if ((sample as any).price !== undefined)
-                price = (sample as any).price;
-              else if ((sample as any).last !== undefined)
-                price = (sample as any).last;
-              else if ((sample as any).bid !== undefined)
-                price = (sample as any).bid;
-              else if ((sample as any).ask !== undefined)
-                price = (sample as any).ask;
-              else if ((sample as any).p !== undefined)
-                price = (sample as any).p;
-            }
-
-            if (price !== null && price !== undefined) {
               const histKey = `forex:history:${instrument.toUpperCase()}`;
               const timestamp = Date.now();
-              // 保存完整响应对象（或数组的第一个对象）作为 value
               const snapshotValue = sample || data;
               this.cacheManager.appendHourlySnapshot(histKey, {
                 timestamp,

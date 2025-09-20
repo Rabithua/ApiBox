@@ -144,6 +144,88 @@ export LOG_LEVEL=debug
   - 可选查询参数: `start` (ISO 时间或毫秒时间戳), `end` (ISO 时间或毫秒时间戳)
   - 示例: `/api/forex/history/XAU?start=2025-09-13T00:00:00Z&end=2025-09-20T00:00:00Z`
 
+### 自动定时采集（Hourly Collector）
+
+- 服务内置了一个每小时在整点触发的采集器，用于在无外部请求时也能主动抓取黄金报价并保存为历史快照。
+- 实现文件: `src/scheduler/collector.ts`。启动时由 `main.ts` 调用 `startHourlyCollector()`，行为是：对齐到下一个整点，然后每小时执行一次采集。
+- 采集逻辑复用 `ProxyEngine.proxyRequest("forex","quote", params)`，因此会触发缓存与历史写入流程（与外部请求触发一致）。
+- 若你在多副本部署（例如 Kubernetes）中运行服务，建议使用外部调度（Kubernetes CronJob 或系统 cron），或在集群中只让单一副本负责采集（leader-election）。
+
+### 历史数据接口详细说明
+
+- Endpoint: `GET /api/forex/history/XAU`
+- 返回结构: JSON 对象包含 `instrument`, `count`, `history`。其中 `history` 是按时间升序的数组，元素格式为:
+
+```json
+{ "timestamp": 1690000000000, "value": { ... 原始接口返回的完整对象 ... } }
+```
+
+- `value` 字段为代理接口返回的完整对象（或数组的第一个对象），数据库持久化时以 `JSONB` 存储，API 返回时会解析回原始结构。
+- 时间过滤：可通过 `start` / `end` 查询参数筛选时间范围，支持 ISO 字符串或毫秒时间戳。
+
+### 数据库持久化（可选）
+
+- 使用 PostgreSQL 以持久化历史快照（表 `forex_history`）：
+  - 表结构（当首次写入时会自动创建）:
+
+```sql
+CREATE TABLE IF NOT EXISTS forex_history (
+  id BIGSERIAL PRIMARY KEY,
+  instrument VARCHAR(16) NOT NULL,
+  ts TIMESTAMP WITH TIME ZONE NOT NULL,
+  value JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_forex_history_instrument_ts ON forex_history (instrument, ts);
+```
+
+- 环境变量控制：
+
+  - `ENABLE_DB_PERSISTENCE` - 设置为 `true` 启用数据库持久化（默认关闭）。
+  - `DATABASE_URL` - PostgreSQL 连接字符串（例如 `postgres://user:pass@host:5432/dbname`）。
+
+- 启用后，服务在第一次写入时会调用 `initDb()` 建立长连接（长连接模式），后续写入复用该连接。
+
+### 启动与运行示例（含持久化）
+
+1. 导出环境变量（bash/zsh）：
+
+```bash
+export PORT=8000
+export HOST=0.0.0.0
+export ENABLE_DB_PERSISTENCE=true
+export DATABASE_URL="postgres://user:password@dbhost:5432/dbname"
+```
+
+2. 启动服务（需要网络与读取环境）：
+
+```bash
+deno run --allow-net --allow-env --allow-read main.ts
+```
+
+3. 手动触发一次采集（可用于验证）：
+
+```bash
+curl http://localhost:8000/api/forex/quote/XAU/USD
+```
+
+4. 使用 `psql` 查看写入（示例）：
+
+```bash
+psql "$DATABASE_URL" -c "SELECT instrument, ts, value FROM forex_history WHERE instrument='XAU' ORDER BY ts DESC LIMIT 10;"
+```
+
+注意：`--allow-read` 用于读取 `.env`（如果你使用 `.env`），`--allow-env` 读取环境变量，`--allow-net` 用于对外 fetch 与数据库连接。
+
+### 优雅关闭与数据库连接
+
+- 服务会在收到 `SIGINT`/`SIGTERM` 时执行优雅关闭：关闭 HTTP 服务器并调用 `closeDb()` 以关闭数据库连接（如果启用了持久化并建立了连接）。
+
+### 采集策略与可配置性
+
+- 当前采集器默认每小时采集 `XAU/USD`。若需采集更多品种或使用不同频率，建议：
+  - 在 `src/scheduler/collector.ts` 中调整或扩展 `doCollect()`，或
+  - 使用外部调度（Cron / Kubernetes CronJob）调用服务内的触发端点（如新增 `/internal/collect/...`）。
+
 ### 示例请求
 
 ````bash
