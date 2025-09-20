@@ -91,7 +91,7 @@ export class RouteHandler {
    * 处理黄金历史数据请求
    * 支持查询参数: start, end (ISO字符串或时间戳毫秒)
    */
-  private handleForexHistory(url: URL): Response {
+  private async handleForexHistory(url: URL): Promise<Response> {
     // path: /api/forex/history/XAU or /api/forex/history
     const parts = url.pathname.split("/").filter(Boolean); // e.g. ["api","forex","history","XAU"]
     const instrument = (parts[3] || "XAU").toUpperCase();
@@ -118,7 +118,7 @@ export class RouteHandler {
     const end = parseTime(endParam);
 
     const histKey = `forex:history:${instrument}`;
-    const history = this.cacheManager.getHistory(histKey, start, end);
+    const history = await this.cacheManager.getHistory(histKey, start, end);
 
     return createJsonResponse({ instrument, count: history.length, history });
   }

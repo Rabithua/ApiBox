@@ -1,6 +1,17 @@
 import type { CacheItem } from "../types/index.ts";
 import { EnvManager } from "../env/manager.ts";
 
+// 延迟加载数据库模块的函数（仅在开启持久化时加载）
+const loadDbModule = async () => {
+  if (Deno.env.get("ENABLE_DB_PERSISTENCE") !== "true") return null;
+  try {
+    return await import("../db/client.ts");
+  } catch (_e) {
+    console.warn("⚠️ 无法加载数据库模块（npm:pg 可能未安装或不可用）");
+    return null;
+  }
+};
+
 /**
  * 缓存管理器类
  */
@@ -71,7 +82,6 @@ export class CacheManager {
     // 获取已有历史
     const existing = this.cache.get(key) as CacheItem | undefined;
     let history: Array<{ timestamp: number; value: unknown }> = [];
-
     if (existing && Array.isArray(existing.data)) {
       history = existing.data as Array<{ timestamp: number; value: unknown }>;
     }
@@ -95,33 +105,110 @@ export class CacheManager {
     // 存回缓存（不使用 TTL，因为我们通过条数来控制历史长度）
     const item: CacheItem = { data: history, timestamp: Date.now() };
     this.cache.set(key, item);
+
+    // 异步写入数据库（如果 ENABLE_DB_PERSISTENCE=true）
+    (async () => {
+      try {
+        const db = await loadDbModule();
+        if (!db || typeof db.insertSnapshot !== "function") return;
+
+        const parts = key.split(":");
+        const instrument = parts[2] || parts[1] || "XAU";
+        const snapshotToWrite = history[history.length - 1];
+        const numeric =
+          typeof snapshotToWrite.value === "string"
+            ? Number(snapshotToWrite.value)
+            : (snapshotToWrite.value as number);
+
+        await db.initDb();
+        await db.ensureSchema();
+        await db.insertSnapshot(instrument, snapshotToWrite.timestamp, numeric);
+      } catch (err) {
+        console.warn("数据库持久化失败:", err);
+      }
+    })();
   }
 
   /**
    * 获取历史数据。返回按时间升序的数组
    * start 和 end 是可选的 ISO 字符串或时间戳（毫秒）
    */
-  public getHistory(
+  public async getHistory(
     key: string,
     start?: number,
     end?: number
-  ): Array<{ timestamp: number; value: unknown }> {
+  ): Promise<Array<{ timestamp: number; value: unknown }>> {
+    // 内存中的历史
     const existing = this.cache.get(key) as CacheItem | undefined;
-    if (!existing || !Array.isArray(existing.data)) return [];
-
-    let history = existing.data as Array<{ timestamp: number; value: unknown }>;
-
-    // 过滤时间范围
-    if (start !== undefined) {
-      history = history.filter((h) => h.timestamp >= start);
-    }
-    if (end !== undefined) {
-      history = history.filter((h) => h.timestamp <= end);
+    let memHistory: Array<{ timestamp: number; value: unknown }> = [];
+    if (existing && Array.isArray(existing.data)) {
+      memHistory = existing.data as Array<{
+        timestamp: number;
+        value: unknown;
+      }>;
     }
 
-    // 保证按时间升序
-    history.sort((a, b) => a.timestamp - b.timestamp);
-    return history;
+    // 如果没有开启持久化，直接返回内存历史（按时间升序并筛选）
+    if (Deno.env.get("ENABLE_DB_PERSISTENCE") !== "true") {
+      let history = memHistory.slice();
+      if (start !== undefined)
+        history = history.filter((h) => h.timestamp >= start);
+      if (end !== undefined)
+        history = history.filter((h) => h.timestamp <= end);
+      history.sort((a, b) => a.timestamp - b.timestamp);
+      return history;
+    }
+
+    // 否则，从数据库拉取历史并与内存合并
+    try {
+      const db = await loadDbModule();
+      if (!db || typeof db.queryHistory !== "function") {
+        // 无法加载 DB 模块，降级至内存
+        let history = memHistory.slice();
+        if (start !== undefined)
+          history = history.filter((h) => h.timestamp >= start);
+        if (end !== undefined)
+          history = history.filter((h) => h.timestamp <= end);
+        history.sort((a, b) => a.timestamp - b.timestamp);
+        return history;
+      }
+
+      // instrument 从 key 推导：forex:history:XAU
+      const parts = key.split(":");
+      const instrument = parts[2] || parts[1] || "XAU";
+
+      await db.initDb();
+      await db.ensureSchema();
+      const dbRows = await db.queryHistory(instrument, start, end);
+
+      // dbRows: Array<{ timestamp:number, value:number }>
+      // 将 DB 数据与内存数据合并，基于 timestamp 去重（以 DB 为准）
+      const map = new Map<number, { timestamp: number; value: unknown }>();
+      for (const r of memHistory) {
+        map.set(r.timestamp, { timestamp: r.timestamp, value: r.value });
+      }
+      for (const r of dbRows) {
+        map.set(r.timestamp, { timestamp: r.timestamp, value: r.value });
+      }
+
+      let merged = Array.from(map.values());
+      // 过滤时间范围（dbRows 已按范围，但 memHistory 可能超出）
+      if (start !== undefined)
+        merged = merged.filter((h) => h.timestamp >= start);
+      if (end !== undefined) merged = merged.filter((h) => h.timestamp <= end);
+
+      merged.sort((a, b) => a.timestamp - b.timestamp);
+      return merged;
+    } catch (err) {
+      console.warn("从数据库获取历史失败，回退到内存：", err);
+      let history = memHistory.slice();
+      if (start !== undefined)
+        history = history.filter((h) => h.timestamp >= start);
+      if (end !== undefined)
+        history = history.filter((h) => h.timestamp <= end);
+      history.sort((a, b) => a.timestamp - b.timestamp);
+      return history;
+    }
   }
 
   /**
