@@ -34,8 +34,21 @@ export class TaskScheduler {
       enabled?: boolean;
       maxErrors?: number;
       runImmediately?: boolean;
+      alignToHour?: boolean;
     } = {}
   ): void {
+    let nextRun: Date;
+
+    if (options.alignToHour && intervalMs >= 60 * 60 * 1000) {
+      // Calculate next hour boundary
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      nextRun = nextHour;
+    } else {
+      nextRun = new Date(Date.now() + intervalMs);
+    }
+
     const task: ScheduledTask = {
       id,
       name,
@@ -44,12 +57,14 @@ export class TaskScheduler {
       enabled: options.enabled ?? true,
       errorCount: 0,
       maxErrors: options.maxErrors ?? 5,
-      nextRun: new Date(Date.now() + intervalMs),
+      nextRun,
     };
 
     this.tasks.set(id, task);
     Logger.info(
-      `📅 Scheduled task added: ${name} (every ${intervalMs / 1000}s)`
+      `📅 Scheduled task added: ${name} (every ${intervalMs / 1000}s)${
+        options.alignToHour ? " - aligned to hour" : ""
+      }`
     );
 
     // Run immediately if requested
@@ -88,16 +103,43 @@ export class TaskScheduler {
     }
 
     task.enabled = true;
-    task.nextRun = new Date(Date.now() + task.intervalMs);
 
-    const intervalId = setInterval(async () => {
-      if (task.enabled) {
-        await this.runTask(task);
+    // Use the pre-calculated nextRun time if available, otherwise calculate it
+    if (!task.nextRun) {
+      task.nextRun = new Date(Date.now() + task.intervalMs);
+    }
+
+    // Use absolute time-based scheduling to prevent drift
+    const scheduleNextRun = () => {
+      if (!task.enabled) return;
+
+      const now = new Date();
+      const timeUntilNext = task.nextRun!.getTime() - now.getTime();
+
+      if (timeUntilNext <= 0) {
+        // Time to run the task
+        this.runTask(task).finally(() => {
+          // Schedule next run after current execution
+          if (task.enabled) {
+            this.scheduleNextExecution(task);
+            scheduleNextRun();
+          }
+        });
+      } else {
+        // Schedule next check
+        setTimeout(scheduleNextRun, Math.min(timeUntilNext, 60000)); // Check at most every minute
       }
-    }, task.intervalMs);
+    };
 
-    this.intervals.set(id, intervalId);
-    Logger.info(`▶️ Started scheduled task: ${task.name}`);
+    // Start the scheduling loop
+    scheduleNextRun();
+
+    this.intervals.set(id, 1); // Use a placeholder value since we're not using setInterval
+    Logger.info(
+      `▶️ Started scheduled task: ${
+        task.name
+      } (next run: ${task.nextRun?.toISOString()})`
+    );
   }
 
   /**
@@ -105,10 +147,8 @@ export class TaskScheduler {
    */
   stopTask(id: string): void {
     const task = this.tasks.get(id);
-    const intervalId = this.intervals.get(id);
 
-    if (intervalId) {
-      clearInterval(intervalId);
+    if (this.intervals.has(id)) {
       this.intervals.delete(id);
     }
 
@@ -174,6 +214,29 @@ export class TaskScheduler {
   }
 
   /**
+   * Schedule the next execution for a task
+   */
+  private scheduleNextExecution(task: ScheduledTask): void {
+    const now = new Date();
+
+    if (task.intervalMs >= 60 * 60 * 1000) {
+      // For hourly or longer intervals, align to the next hour boundary
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      task.nextRun = nextHour;
+    } else {
+      // For shorter intervals, use the interval
+      task.nextRun = new Date(now.getTime() + task.intervalMs);
+    }
+
+    Logger.debug(
+      `📅 Next execution scheduled for ${
+        task.name
+      }: ${task.nextRun.toISOString()}`
+    );
+  }
+
+  /**
    * Run a task immediately
    */
   private async runTask(task: ScheduledTask): Promise<void> {
@@ -187,7 +250,6 @@ export class TaskScheduler {
 
       await task.handler();
 
-      task.nextRun = new Date(Date.now() + task.intervalMs);
       task.errorCount = 0; // Reset error count on success
 
       Logger.debug(`✅ Completed scheduled task: ${task.name}`);

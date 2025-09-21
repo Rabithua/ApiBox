@@ -313,8 +313,8 @@ export function initializeForexTasks(): void {
         // Fetch current XAU/USD data
         const data = await fetchForexData("XAU", "USD");
 
-        // Save to database
-        await saveForexQuote("XAU", "USD", data);
+        // Save to database with hour-aligned timestamp
+        await saveForexQuote("XAU", "USD", data, undefined, true);
 
         Logger.success(
           "✅ Scheduled forex data collection completed for XAU/USD"
@@ -328,6 +328,7 @@ export function initializeForexTasks(): void {
       enabled: true,
       maxErrors: 3,
       runImmediately: false, // Don't run immediately on startup
+      alignToHour: true, // Align task execution to hour boundaries
     }
   );
 
@@ -350,12 +351,16 @@ export async function handleForexDebugTrigger(_url: URL): Promise<Response> {
     try {
       const db = getDatabase();
       if (db.isConnected) {
-        await saveForexQuote("XAU", "USD", data);
+        // Use hour-aligned timestamp for debug trigger as well
+        await saveForexQuote("XAU", "USD", data, undefined, true);
         dbResult = {
           status: "success",
-          message: "Data saved to database successfully",
+          message:
+            "Data saved to database successfully with hour-aligned timestamp",
         };
-        Logger.success("✅ Debug trigger: Data saved to database");
+        Logger.success(
+          "✅ Debug trigger: Data saved to database with hour-aligned timestamp"
+        );
       } else {
         dbResult = {
           status: "warning",

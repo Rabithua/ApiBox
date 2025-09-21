@@ -314,7 +314,8 @@ export async function saveForexQuote(
   instrument: string,
   currency: string,
   data: any,
-  timestamp?: Date
+  timestamp?: Date,
+  alignToHour: boolean = false
 ): Promise<void> {
   const db = getDatabase();
 
@@ -326,7 +327,16 @@ export async function saveForexQuote(
       created_at = CURRENT_TIMESTAMP
   `;
 
-  const queryTimestamp = timestamp || new Date();
+  let queryTimestamp: Date;
+  if (timestamp) {
+    queryTimestamp = timestamp;
+  } else if (alignToHour) {
+    // Align to the current hour (set minutes, seconds, and milliseconds to 0)
+    queryTimestamp = new Date();
+    queryTimestamp.setMinutes(0, 0, 0);
+  } else {
+    queryTimestamp = new Date();
+  }
 
   try {
     await db.query(insertSQL, [
