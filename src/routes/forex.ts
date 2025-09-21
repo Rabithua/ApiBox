@@ -90,17 +90,7 @@ export async function handleForexQuote(url: URL): Promise<Response> {
   try {
     const data = await fetchForexData(instrument, currency);
 
-    // Save to database if database is available
-    try {
-      const db = getDatabase();
-      if (db.isConnected) {
-        await saveForexQuote(instrument, currency, data);
-      }
-    } catch (dbError) {
-      // Log database error but don't fail the request
-      Logger.warn(`Failed to save forex data to database: ${dbError}`);
-    }
-
+    // Quote API is for real-time data only, no database saving
     return createJsonResponse(
       data,
       200,
