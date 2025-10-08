@@ -1,5 +1,12 @@
-[nix]
-url = "github:NixOS/nixpkgs/nixos-24.05"
-
 [phases.setup]
-nixPkgs = ["deno_1_46"]
+nixPkgs = ["curl", "bash"]
+
+[phases.build]
+cmds = [
+    "curl -fsSL https://deno.land/install.sh | bash -s v1.46.3",
+    "~/.deno/bin/deno --version",
+    "~/.deno/bin/deno cache src/routes/index.ts",
+]
+
+[start]
+cmd = "~/.deno/bin/deno task start"
