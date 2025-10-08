@@ -1,2 +1,5 @@
+[nix]
+url = "github:NixOS/nixpkgs/nixos-24.05"
+
 [phases.setup]
-nixPkgs = ["deno"]
+nixPkgs = ["deno_1_46"]
