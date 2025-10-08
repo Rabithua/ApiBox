@@ -3,7 +3,7 @@ nixPkgs = ["curl", "bash", "unzip"]
 
 [phases.build]
 cmds = [
-    "curl -fsSL https://deno.land/install.sh | bash -s v1.46.3",
+    "curl -fsSL https://deno.land/install.sh | bash",
     "~/.deno/bin/deno --version",
     "~/.deno/bin/deno cache src/routes/index.ts",
 ]
