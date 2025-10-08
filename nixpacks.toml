@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["deno_1_46"]
+nixPkgs = ["deno"]
