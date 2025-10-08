@@ -16,6 +16,11 @@ import {
   handleForexDebugTrigger as _handleForexDebugTrigger, // temporarily disabled
   getForexTasksStatus,
 } from "./forex.ts";
+import {
+  handleChatCompletions,
+  handleSimpleChat,
+  handleChatModels,
+} from "./chat.ts";
 import { databaseHealthCheck } from "../utils/database.ts";
 
 /**
@@ -35,6 +40,22 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
+    // Chat API routes
+    if (url.pathname === "/api/chat/completions") {
+      Logger.debug("Routing to chat completions handler");
+      return await handleChatCompletions(req);
+    }
+
+    if (url.pathname === "/api/chat/simple") {
+      Logger.debug("Routing to simple chat handler");
+      return await handleSimpleChat(req);
+    }
+
+    if (url.pathname === "/api/chat/models") {
+      Logger.debug("Routing to chat models handler");
+      return handleChatModels();
+    }
+
     // Forex API route: /api/forex/quote/{instrument}/{currency}
     if (url.pathname.startsWith("/api/forex/quote/")) {
       Logger.debug(`Routing to forex quote handler: ${url.pathname}`);
@@ -101,6 +122,9 @@ export async function handleRequest(req: Request): Promise<Response> {
           version: "0.0.1",
           description: "Universal API proxy service",
           endpoints: {
+            chat_completions: "/api/chat/completions",
+            chat_simple: "/api/chat/simple",
+            chat_models: "/api/chat/models",
             forex_quote: "/api/forex/quote/{instrument}/{currency}",
             forex_history: "/api/forex/history/{instrument}/{currency}",
             // forex_debug_trigger: "/api/forex/debug/trigger", // temporarily disabled
@@ -136,6 +160,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       {
         available_endpoints: {
           info: "/ - Service information and available endpoints",
+          chat_completions:
+            "/api/chat/completions - Chat completions using OpenAI-compatible API",
+          chat_simple: "/api/chat/simple - Simple chat with a single message",
+          chat_models: "/api/chat/models - Available chat models",
           forex_quote:
             "/api/forex/quote/{instrument}/{currency} - Real-time forex quotes",
           forex_history:
@@ -147,6 +175,11 @@ export async function handleRequest(req: Request): Promise<Response> {
           favicon: "/favicon.ico - Service favicon",
         },
         examples: {
+          chat_completions: [
+            "/api/chat/completions - POST with messages array",
+          ],
+          chat_simple: ["/api/chat/simple - POST with message string"],
+          chat_models: ["/api/chat/models - GET available models"],
           forex_quote: [
             "/api/forex/quote/XAU/USD",
             "/api/forex/quote/EUR/USD",

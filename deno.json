@@ -8,6 +8,7 @@
     "check": "deno check main.ts"
   },
   "imports": {
+    "@openai/openai": "jsr:@openai/openai@^6.2.0",
     "@std/assert": "https://deno.land/std@0.224.0/assert/mod.ts",
     "@std/bytes": "https://deno.land/std@0.224.0/bytes/mod.ts",
     "@std/bytes/copy": "https://deno.land/std@0.224.0/bytes/copy.ts",
