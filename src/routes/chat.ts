@@ -3,18 +3,25 @@
  * Provides conversation services through Alibaba Cloud's DashScope
  */
 
-import { OpenAI } from "@openai/openai";
+import OpenAI from "@openai/openai";
 import {
   Logger,
   createJsonResponse,
   createErrorResponse,
 } from "../utils/helpers.ts";
 
-// Initialize OpenAI client with DashScope configuration
-const openai = new OpenAI({
-  apiKey: Deno.env.get("DASHSCOPE_API_KEY"),
-  baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-});
+// Function to get OpenAI client instance
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = Deno.env.get("DASHSCOPE_API_KEY");
+  if (!apiKey) {
+    return null;
+  }
+
+  return new OpenAI({
+    apiKey,
+    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  });
+}
 
 /**
  * Message interface for chat requests
@@ -52,9 +59,9 @@ export async function handleChatCompletions(req: Request): Promise<Response> {
       ]);
     }
 
-    // Validate API key
-    const apiKey = Deno.env.get("DASHSCOPE_API_KEY");
-    if (!apiKey) {
+    // Validate API key and get client
+    const openai = getOpenAIClient();
+    if (!openai) {
       Logger.error("DASHSCOPE_API_KEY environment variable not set");
       return createErrorResponse("Service configuration error", 500, [
         {
